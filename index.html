@@ -26,7 +26,26 @@
         .input-section {
             display: flex;
             gap: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
+        }
+
+        .history-section {
+            margin-bottom: 20px;
+        }
+
+        #history-select {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            color: #333;
+        }
+
+        #history-select:focus {
+            outline: none;
+            border-color: #ff6600;
         }
 
         #url-input {
@@ -285,12 +304,19 @@
         <button id="load-btn" onclick="loadThread()">Load Thread</button>
     </div>
 
+    <div class="history-section">
+        <select id="history-select" onchange="loadFromHistory()">
+            <option value="">-- Recent threads --</option>
+        </select>
+    </div>
+
     <div id="content"></div>
 
     <script>
         const HN_API_BASE = 'https://hacker-news.firebaseio.com/v0';
         const STORAGE_KEY = 'hn-read-comments';
         const COLLAPSED_KEY = 'hn-collapsed-comments';
+        const HISTORY_KEY = 'hn-thread-history';
 
         // Get read comments from localStorage
         function getReadComments() {
@@ -318,6 +344,57 @@
         // Save collapsed comments to localStorage
         function saveCollapsedComments(collapsed) {
             localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
+        }
+
+        // Get thread history from localStorage
+        function getThreadHistory() {
+            try {
+                return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            } catch {
+                return [];
+            }
+        }
+
+        // Save thread to history
+        function saveToHistory(id, title) {
+            let history = getThreadHistory();
+            // Remove if already exists
+            history = history.filter(h => h.id !== id);
+            // Add to front
+            history.unshift({ id, title, timestamp: Date.now() });
+            // Keep only last 20
+            history = history.slice(0, 20);
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            populateHistoryDropdown();
+        }
+
+        // Populate history dropdown
+        function populateHistoryDropdown() {
+            const select = document.getElementById('history-select');
+            const history = getThreadHistory();
+
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">-- Recent threads --</option>';
+
+            history.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.title.length > 60
+                    ? item.title.substring(0, 60) + '...'
+                    : item.title;
+                select.appendChild(option);
+            });
+        }
+
+        // Load thread from history dropdown
+        function loadFromHistory() {
+            const select = document.getElementById('history-select');
+            const id = select.value;
+            if (!id) return;
+
+            document.getElementById('url-input').value = id;
+            loadThread();
+            select.value = ''; // Reset dropdown
         }
 
         // Mark a comment as read
@@ -630,6 +707,9 @@
                 contentDiv.innerHTML = html;
                 updateStats();
 
+                // Save to history
+                saveToHistory(story.id.toString(), story.title);
+
             } catch (error) {
                 contentDiv.innerHTML = `<div class="error">Error loading thread: ${error.message}</div>`;
                 console.error(error);
@@ -642,6 +722,9 @@
         document.getElementById('url-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') loadThread();
         });
+
+        // Initialize history dropdown
+        populateHistoryDropdown();
 
         // Check for URL in query string
         const params = new URLSearchParams(window.location.search);
