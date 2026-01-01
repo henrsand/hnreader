@@ -641,6 +641,16 @@
             return text.substring(0, 100) + '...';
         }
 
+        // Check if a comment has any unread descendants
+        function hasUnreadDescendants(comment, readComments) {
+            if (!comment.replies || comment.replies.length === 0) return false;
+            for (const reply of comment.replies) {
+                if (!readComments[reply.id]) return true; // This reply is unread
+                if (hasUnreadDescendants(reply, readComments)) return true; // Has unread deeper
+            }
+            return false;
+        }
+
         // Render a single comment
         function renderComment(comment, readComments, collapsedComments) {
             if (comment.deleted || comment.dead) {
@@ -654,21 +664,25 @@
             const isRead = !!readComments[comment.id];
             const statusClass = isRead ? 'read' : 'unread';
             const hasReplies = comment.replies && comment.replies.length > 0;
-            // Auto-collapse if explicitly collapsed OR if read
-            const isCollapsed = !!collapsedComments[comment.id] || isRead;
+            const hasUnread = hasReplies && hasUnreadDescendants(comment, readComments);
+
+            // Comment text collapses if explicitly collapsed OR if read
+            const isTextCollapsed = !!collapsedComments[comment.id] || isRead;
+            // Replies only collapse if no unread descendants (keep path to unread visible)
+            const areRepliesCollapsed = isTextCollapsed && !hasUnread;
 
             const repliesHtml = hasReplies
-                ? `<div class="replies${isCollapsed ? ' collapsed' : ''}">${comment.replies.map(r => renderComment(r, readComments, collapsedComments)).join('')}</div>`
+                ? `<div class="replies${areRepliesCollapsed ? ' collapsed' : ''}">${comment.replies.map(r => renderComment(r, readComments, collapsedComments)).join('')}</div>`
                 : '';
 
             const replyCount = hasReplies ? countReplies(comment) : 0;
             const preview = getTextPreview(comment.text);
 
             return `
-                <div class="comment ${statusClass}${isCollapsed ? ' collapsed-parent' : ''}" data-comment-id="${comment.id}">
+                <div class="comment ${statusClass}${isTextCollapsed ? ' collapsed-parent' : ''}" data-comment-id="${comment.id}">
                     <div class="comment-header">
                         <span class="comment-meta">
-                            <button class="collapse-btn" onclick="toggleCollapse(${comment.id})">${isCollapsed ? '+' : '−'}</button>
+                            <button class="collapse-btn" onclick="toggleCollapse(${comment.id})">${isTextCollapsed ? '+' : '−'}</button>
                             <a href="https://news.ycombinator.com/user?id=${comment.by}" target="_blank">${comment.by || 'unknown'}</a>
                             · ${formatTime(comment.time)}
                             ${hasReplies ? `· ${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}` : ''}
