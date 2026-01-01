@@ -11,7 +11,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             background: #f6f6ef;
@@ -198,10 +198,26 @@
         }
 
         .replies {
-            margin-left: 25px;
-            margin-top: 10px;
-            border-left: 2px solid #eee;
-            padding-left: 15px;
+            margin-left: 12px;
+            margin-top: 8px;
+            border-left: 2px solid #ddd;
+            padding-left: 10px;
+        }
+
+        .replies.collapsed {
+            display: none;
+        }
+
+        .collapse-btn {
+            background: #ddd;
+            color: #666;
+            font-size: 11px;
+            padding: 2px 8px;
+            min-width: 24px;
+        }
+
+        .collapse-btn:hover {
+            background: #ccc;
         }
 
         .loading {
@@ -323,6 +339,19 @@
             updateStats();
         }
 
+        // Toggle collapse/expand of replies
+        function toggleCollapse(commentId) {
+            const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (!commentEl) return;
+
+            const repliesEl = commentEl.querySelector(':scope > .replies');
+            const btn = commentEl.querySelector(':scope > .comment-header .collapse-btn');
+            if (!repliesEl || !btn) return;
+
+            const isCollapsed = repliesEl.classList.toggle('collapsed');
+            btn.textContent = isCollapsed ? '+' : '−';
+        }
+
         // Update the UI for a single comment
         function updateCommentUI(commentId, isRead) {
             const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
@@ -421,6 +450,12 @@
             return date.toLocaleDateString();
         }
 
+        // Count total replies recursively
+        function countReplies(comment) {
+            if (!comment.replies || comment.replies.length === 0) return 0;
+            return comment.replies.reduce((sum, reply) => sum + 1 + countReplies(reply), 0);
+        }
+
         // Render a single comment
         function renderComment(comment, readComments) {
             if (comment.deleted || comment.dead) {
@@ -438,17 +473,22 @@
                 ? `<div class="replies">${comment.replies.map(r => renderComment(r, readComments)).join('')}</div>`
                 : '';
 
+            const hasReplies = comment.replies && comment.replies.length > 0;
+            const replyCount = hasReplies ? countReplies(comment) : 0;
+
             return `
                 <div class="comment ${statusClass}" data-comment-id="${comment.id}">
                     <div class="comment-header">
                         <span class="comment-meta">
+                            ${hasReplies ? `<button class="collapse-btn" onclick="toggleCollapse(${comment.id})">−</button>` : ''}
                             <a href="https://news.ycombinator.com/user?id=${comment.by}" target="_blank">${comment.by || 'unknown'}</a>
                             · ${formatTime(comment.time)}
+                            ${hasReplies ? `· ${replyCount} repl${replyCount === 1 ? 'y' : 'ies'}` : ''}
                             · <a href="https://news.ycombinator.com/item?id=${comment.id}" target="_blank">link</a>
                         </span>
                         <div class="comment-actions">
                             <button class="mark-read-btn" onclick="markAsRead(${comment.id})" ${isRead ? 'style="display:none"' : ''}>Mark Read</button>
-                            ${comment.replies && comment.replies.length > 0
+                            ${hasReplies
                                 ? `<button onclick="markTreeAsRead(${comment.id})">Mark Tree Read</button>`
                                 : ''}
                         </div>
