@@ -392,7 +392,7 @@
             const id = select.value;
             if (!id) return;
 
-            document.getElementById('url-input').value = id;
+            document.getElementById('url-input').value = `https://news.ycombinator.com/item?id=${id}`;
             loadThread();
             select.value = ''; // Reset dropdown
         }
