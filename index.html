@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HN Read Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f6f6ef;
+            color: #333;
+        }
+
+        h1 {
+            color: #ff6600;
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        #url-input {
+            flex: 1;
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #url-input:focus {
+            outline: none;
+            border-color: #ff6600;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #ff6600;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #e55a00;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .story-header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .story-title {
+            font-size: 20px;
+            margin: 0 0 10px 0;
+        }
+
+        .story-title a {
+            color: #333;
+            text-decoration: none;
+        }
+
+        .story-title a:hover {
+            text-decoration: underline;
+        }
+
+        .story-meta {
+            color: #828282;
+            font-size: 14px;
+        }
+
+        .comments-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .comments-header h2 {
+            margin: 0;
+        }
+
+        #mark-all-read {
+            font-size: 14px;
+            padding: 8px 16px;
+        }
+
+        .comment {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #ddd;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .comment.unread {
+            font-weight: bold;
+            border-left-color: #ff6600;
+        }
+
+        .comment.unread .comment-text {
+            font-weight: bold;
+        }
+
+        .comment.read .comment-text {
+            font-weight: normal;
+        }
+
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: normal;
+        }
+
+        .comment-meta {
+            color: #828282;
+            font-size: 13px;
+        }
+
+        .comment-meta a {
+            color: #828282;
+            text-decoration: none;
+        }
+
+        .comment-meta a:hover {
+            text-decoration: underline;
+        }
+
+        .comment-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .comment-actions button {
+            font-size: 12px;
+            padding: 4px 10px;
+            background: #828282;
+        }
+
+        .comment-actions button:hover {
+            background: #666;
+        }
+
+        .comment-actions button.mark-read-btn {
+            background: #ff6600;
+        }
+
+        .comment-text {
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .comment-text a {
+            color: #ff6600;
+        }
+
+        .comment-text p {
+            margin: 0 0 10px 0;
+        }
+
+        .comment-text p:last-child {
+            margin-bottom: 0;
+        }
+
+        .comment-text pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+
+        .comment-text code {
+            background: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .replies {
+            margin-left: 25px;
+            margin-top: 10px;
+            border-left: 2px solid #eee;
+            padding-left: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #828282;
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .deleted-comment {
+            color: #999;
+            font-style: italic;
+        }
+
+        .stats {
+            background: #fff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .stats strong {
+            color: #ff6600;
+        }
+    </style>
+</head>
+<body>
+    <h1>HN Read Tracker</h1>
+
+    <div class="input-section">
+        <input type="text" id="url-input" placeholder="Paste Hacker News thread URL (e.g., https://news.ycombinator.com/item?id=12345)">
+        <button id="load-btn" onclick="loadThread()">Load Thread</button>
+    </div>
+
+    <div id="content"></div>
+
+    <script>
+        const HN_API_BASE = 'https://hacker-news.firebaseio.com/v0';
+        const STORAGE_KEY = 'hn-read-comments';
+
+        // Get read comments from localStorage
+        function getReadComments() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            } catch {
+                return {};
+            }
+        }
+
+        // Save read comments to localStorage
+        function saveReadComments(readComments) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(readComments));
+        }
+
+        // Mark a comment as read
+        function markAsRead(commentId) {
+            const readComments = getReadComments();
+            readComments[commentId] = Date.now();
+            saveReadComments(readComments);
+            updateCommentUI(commentId, true);
+            updateStats();
+        }
+
+        // Mark a comment and all its descendants as read
+        function markTreeAsRead(commentId) {
+            const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (!commentEl) return;
+
+            const readComments = getReadComments();
+
+            // Mark this comment
+            readComments[commentId] = Date.now();
+            updateCommentUI(commentId, true);
+
+            // Find all descendant comments
+            const descendants = commentEl.querySelectorAll('[data-comment-id]');
+            descendants.forEach(desc => {
+                const id = desc.dataset.commentId;
+                readComments[id] = Date.now();
+                updateCommentUI(id, true);
+            });
+
+            saveReadComments(readComments);
+            updateStats();
+        }
+
+        // Mark all comments as read
+        function markAllAsRead() {
+            const readComments = getReadComments();
+            const allComments = document.querySelectorAll('[data-comment-id]');
+
+            allComments.forEach(comment => {
+                const id = comment.dataset.commentId;
+                readComments[id] = Date.now();
+                updateCommentUI(id, true);
+            });
+
+            saveReadComments(readComments);
+            updateStats();
+        }
+
+        // Update the UI for a single comment
+        function updateCommentUI(commentId, isRead) {
+            const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (!commentEl) return;
+
+            if (isRead) {
+                commentEl.classList.remove('unread');
+                commentEl.classList.add('read');
+                const btn = commentEl.querySelector('.mark-read-btn');
+                if (btn) btn.style.display = 'none';
+            } else {
+                commentEl.classList.remove('read');
+                commentEl.classList.add('unread');
+            }
+        }
+
+        // Update stats display
+        function updateStats() {
+            const statsEl = document.getElementById('stats');
+            if (!statsEl) return;
+
+            const allComments = document.querySelectorAll('[data-comment-id]');
+            const readComments = getReadComments();
+
+            let total = 0;
+            let read = 0;
+
+            allComments.forEach(comment => {
+                total++;
+                if (readComments[comment.dataset.commentId]) {
+                    read++;
+                }
+            });
+
+            statsEl.innerHTML = `<strong>${read}</strong> of <strong>${total}</strong> comments read`;
+        }
+
+        // Extract item ID from HN URL
+        function extractItemId(url) {
+            const match = url.match(/[?&]id=(\d+)/);
+            if (match) return match[1];
+
+            // Also try to match just a number
+            const numMatch = url.match(/^(\d+)$/);
+            if (numMatch) return numMatch[1];
+
+            return null;
+        }
+
+        // Fetch an item from HN API
+        async function fetchItem(id) {
+            const response = await fetch(`${HN_API_BASE}/item/${id}.json`);
+            if (!response.ok) throw new Error(`Failed to fetch item ${id}`);
+            return response.json();
+        }
+
+        // Fetch all comments recursively
+        async function fetchComments(commentIds, depth = 0) {
+            if (!commentIds || commentIds.length === 0) return [];
+
+            const comments = await Promise.all(
+                commentIds.map(async (id) => {
+                    try {
+                        const comment = await fetchItem(id);
+                        if (!comment) return null;
+
+                        // Fetch replies recursively
+                        if (comment.kids && comment.kids.length > 0) {
+                            comment.replies = await fetchComments(comment.kids, depth + 1);
+                        }
+
+                        return comment;
+                    } catch (error) {
+                        console.error(`Error fetching comment ${id}:`, error);
+                        return null;
+                    }
+                })
+            );
+
+            return comments.filter(c => c !== null);
+        }
+
+        // Format timestamp
+        function formatTime(unixTime) {
+            const date = new Date(unixTime * 1000);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 60) return `${diffMins} minutes ago`;
+            if (diffHours < 24) return `${diffHours} hours ago`;
+            if (diffDays < 30) return `${diffDays} days ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        // Render a single comment
+        function renderComment(comment, readComments) {
+            if (comment.deleted || comment.dead) {
+                return `
+                    <div class="comment deleted-comment" data-comment-id="${comment.id}">
+                        <em>[deleted]</em>
+                    </div>
+                `;
+            }
+
+            const isRead = !!readComments[comment.id];
+            const statusClass = isRead ? 'read' : 'unread';
+
+            const repliesHtml = comment.replies && comment.replies.length > 0
+                ? `<div class="replies">${comment.replies.map(r => renderComment(r, readComments)).join('')}</div>`
+                : '';
+
+            return `
+                <div class="comment ${statusClass}" data-comment-id="${comment.id}">
+                    <div class="comment-header">
+                        <span class="comment-meta">
+                            <a href="https://news.ycombinator.com/user?id=${comment.by}" target="_blank">${comment.by || 'unknown'}</a>
+                            · ${formatTime(comment.time)}
+                            · <a href="https://news.ycombinator.com/item?id=${comment.id}" target="_blank">link</a>
+                        </span>
+                        <div class="comment-actions">
+                            <button class="mark-read-btn" onclick="markAsRead(${comment.id})" ${isRead ? 'style="display:none"' : ''}>Mark Read</button>
+                            ${comment.replies && comment.replies.length > 0
+                                ? `<button onclick="markTreeAsRead(${comment.id})">Mark Tree Read</button>`
+                                : ''}
+                        </div>
+                    </div>
+                    <div class="comment-text">${comment.text || ''}</div>
+                    ${repliesHtml}
+                </div>
+            `;
+        }
+
+        // Main function to load and render thread
+        async function loadThread() {
+            const urlInput = document.getElementById('url-input');
+            const contentDiv = document.getElementById('content');
+            const loadBtn = document.getElementById('load-btn');
+
+            const url = urlInput.value.trim();
+            if (!url) {
+                contentDiv.innerHTML = '<div class="error">Please enter a Hacker News URL</div>';
+                return;
+            }
+
+            const itemId = extractItemId(url);
+            if (!itemId) {
+                contentDiv.innerHTML = '<div class="error">Could not extract item ID from URL. Please use a URL like: https://news.ycombinator.com/item?id=12345</div>';
+                return;
+            }
+
+            loadBtn.disabled = true;
+            contentDiv.innerHTML = '<div class="loading">Loading thread</div>';
+
+            try {
+                // Fetch the story
+                const story = await fetchItem(itemId);
+                if (!story) {
+                    throw new Error('Story not found');
+                }
+
+                // Update loading message
+                contentDiv.innerHTML = `<div class="loading">Loading ${story.descendants || 0} comments</div>`;
+
+                // Fetch all comments
+                const comments = story.kids ? await fetchComments(story.kids) : [];
+                const readComments = getReadComments();
+
+                // Render story header
+                let html = `
+                    <div class="story-header">
+                        <h2 class="story-title">
+                            <a href="${story.url || `https://news.ycombinator.com/item?id=${story.id}`}" target="_blank">${story.title}</a>
+                        </h2>
+                        <div class="story-meta">
+                            ${story.score} points by
+                            <a href="https://news.ycombinator.com/user?id=${story.by}" target="_blank">${story.by}</a>
+                            · ${formatTime(story.time)}
+                            · ${story.descendants || 0} comments
+                        </div>
+                        ${story.text ? `<div class="comment-text" style="margin-top: 15px;">${story.text}</div>` : ''}
+                    </div>
+                `;
+
+                // Render comments section
+                html += `
+                    <div class="comments-header">
+                        <h2>Comments</h2>
+                        <button id="mark-all-read" onclick="markAllAsRead()">Mark All Read</button>
+                    </div>
+                    <div class="stats" id="stats"></div>
+                    <div id="comments-container">
+                        ${comments.map(c => renderComment(c, readComments)).join('')}
+                    </div>
+                `;
+
+                contentDiv.innerHTML = html;
+                updateStats();
+
+            } catch (error) {
+                contentDiv.innerHTML = `<div class="error">Error loading thread: ${error.message}</div>`;
+                console.error(error);
+            } finally {
+                loadBtn.disabled = false;
+            }
+        }
+
+        // Allow pressing Enter in the input
+        document.getElementById('url-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadThread();
+        });
+
+        // Check for URL in query string
+        const params = new URLSearchParams(window.location.search);
+        const urlParam = params.get('url') || params.get('id');
+        if (urlParam) {
+            document.getElementById('url-input').value = urlParam;
+            loadThread();
+        }
+    </script>
+</body>
+</html>
