@@ -439,6 +439,29 @@
             updateStats();
         }
 
+        // Mark a comment and all its descendants as unread
+        function markTreeAsUnread(commentId) {
+            const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (!commentEl) return;
+
+            const readComments = getReadComments();
+
+            // Mark this comment as unread
+            delete readComments[commentId];
+            updateCommentUI(commentId, false);
+
+            // Find all descendant comments
+            const descendants = commentEl.querySelectorAll('[data-comment-id]');
+            descendants.forEach(desc => {
+                const id = desc.dataset.commentId;
+                delete readComments[id];
+                updateCommentUI(id, false);
+            });
+
+            saveReadComments(readComments);
+            updateStats();
+        }
+
         // Mark all comments as read
         function markAllAsRead() {
             const readComments = getReadComments();
@@ -528,12 +551,16 @@
 
             const readBtn = commentEl.querySelector(':scope > .comment-header .mark-read-btn');
             const unreadBtn = commentEl.querySelector(':scope > .comment-header .mark-unread-btn');
+            const treeReadBtn = commentEl.querySelector(':scope > .comment-header .mark-tree-read-btn');
+            const treeUnreadBtn = commentEl.querySelector(':scope > .comment-header .mark-tree-unread-btn');
 
             if (isRead) {
                 commentEl.classList.remove('unread');
                 commentEl.classList.add('read');
                 if (readBtn) readBtn.style.display = 'none';
                 if (unreadBtn) unreadBtn.style.display = '';
+                if (treeReadBtn) treeReadBtn.style.display = 'none';
+                if (treeUnreadBtn) treeUnreadBtn.style.display = '';
                 // Auto-collapse when marked as read
                 collapseComment(commentId);
             } else {
@@ -541,6 +568,8 @@
                 commentEl.classList.add('unread');
                 if (readBtn) readBtn.style.display = '';
                 if (unreadBtn) unreadBtn.style.display = 'none';
+                if (treeReadBtn) treeReadBtn.style.display = '';
+                if (treeUnreadBtn) treeUnreadBtn.style.display = 'none';
                 // Auto-expand when marked as unread
                 expandComment(commentId);
             }
@@ -693,7 +722,8 @@
                             <button class="mark-read-btn" onclick="markAsRead(${comment.id})" ${isRead ? 'style="display:none"' : ''}>Mark Read</button>
                             <button class="mark-unread-btn" onclick="markAsUnread(${comment.id})" ${isRead ? '' : 'style="display:none"'}>Mark Unread</button>
                             ${hasReplies
-                                ? `<button onclick="markTreeAsRead(${comment.id})">Mark Tree Read</button>`
+                                ? `<button class="mark-tree-read-btn" onclick="markTreeAsRead(${comment.id})" ${isRead ? 'style="display:none"' : ''}>Mark Tree Read</button>
+                                   <button class="mark-tree-unread-btn" onclick="markTreeAsUnread(${comment.id})" ${isRead ? '' : 'style="display:none"'}>Mark Tree Unread</button>`
                                 : ''}
                         </div>
                     </div>
